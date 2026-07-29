@@ -29,6 +29,7 @@ class LinkStatus:
     status: str
     detail: str
     link_made: bool
+    verify_url: str
 
 
 @dataclass(frozen=True)
@@ -105,15 +106,15 @@ def check_site_status(site: str, timeout: float = 8.0, opener=urlopen) -> LinkSt
             except HTTPError as get_exc:
                 code = get_exc.code
             except (TimeoutError, URLError, OSError) as get_exc:
-                return LinkStatus(normalized, "dead", str(get_exc), False)
+                return LinkStatus(normalized, "dead", str(get_exc), False, "")
         else:
             code = exc.code
     except (TimeoutError, URLError, OSError) as exc:
-        return LinkStatus(normalized, "dead", str(exc), False)
+        return LinkStatus(normalized, "dead", str(exc), False, "")
 
     if 200 <= int(code) < 400:
-        return LinkStatus(normalized, "working", f"HTTP {code}", True)
-    return LinkStatus(normalized, "not working", f"HTTP {code}", False)
+        return LinkStatus(normalized, "working", f"HTTP {code}", True, normalized)
+    return LinkStatus(normalized, "not working", f"HTTP {code}", False, "")
 
 
 def _request_status(site: str, method: str, timeout: float, opener) -> int:
@@ -209,7 +210,7 @@ def write_exports(campaign: BacklinkCampaign, output_dir: str | Path) -> list[Pa
     md_path.write_text(render_outreach(campaign), encoding="utf-8")
     imported_sites = [item.target for item in campaign.opportunities if item.kind == "Imported backlink site"]
     with progress_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["site", "status", "detail", "link_made"])
+        writer = csv.DictWriter(handle, fieldnames=["site", "status", "detail", "link_made", "verify_url"])
         writer.writeheader()
         for status in audit_backlink_sites(imported_sites):
             writer.writerow(asdict(status))

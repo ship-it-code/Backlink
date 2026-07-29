@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 import tkinter as tk
+import webbrowser
 from tkinter import filedialog, messagebox, ttk
 
 if __package__ in {None, ""}:
@@ -60,14 +61,19 @@ class BacklinkBuilderApp(tk.Tk):
 
         ttk.Label(frame, textvariable=self.status_var, wraplength=720).grid(row=5, column=0, columnspan=3, sticky="ew")
 
-        self.progress_table = ttk.Treeview(frame, columns=("site", "status", "detail"), show="headings", height=10)
+        self.progress_table = ttk.Treeview(
+            frame, columns=("site", "status", "verify", "detail"), show="headings", height=10
+        )
         self.progress_table.heading("site", text="Backlink site")
         self.progress_table.heading("status", text="Link made / status")
+        self.progress_table.heading("verify", text="Created backlink link")
         self.progress_table.heading("detail", text="Details")
-        self.progress_table.column("site", width=360)
-        self.progress_table.column("status", width=160)
-        self.progress_table.column("detail", width=220)
+        self.progress_table.column("site", width=260)
+        self.progress_table.column("status", width=150)
+        self.progress_table.column("verify", width=260)
+        self.progress_table.column("detail", width=180)
         self.progress_table.grid(row=6, column=0, columnspan=3, sticky="nsew")
+        self.progress_table.bind("<Double-1>", self._open_selected_verify_link)
 
         scrollbar = ttk.Scrollbar(frame, orient="vertical", command=self.progress_table.yview)
         self.progress_table.configure(yscrollcommand=scrollbar.set)
@@ -110,14 +116,26 @@ class BacklinkBuilderApp(tk.Tk):
 
     def _show_progress(self, backlink_sites: tuple[str, ...]) -> None:
         if not backlink_sites:
-            self.progress_table.insert("", "end", values=("No backlink-sites file attached", "Skipped", "Only default opportunities created"))
+            self.progress_table.insert(
+                "", "end", values=("No backlink-sites file attached", "Skipped", "", "Only default opportunities created")
+            )
             return
 
         for status in audit_backlink_sites(backlink_sites):
             display_status = "Made / working" if status.link_made else "Not working / dead"
-            self.progress_table.insert("", "end", values=(status.site, display_status, status.detail))
+            verify_url = status.verify_url if status.link_made else ""
+            self.progress_table.insert("", "end", values=(status.site, display_status, verify_url, status.detail))
             self.status_var.set(f"Checked {status.site}: {display_status}")
             self.update_idletasks()
+
+
+    def _open_selected_verify_link(self, event: tk.Event) -> None:
+        row_id = self.progress_table.identify_row(event.y)
+        if not row_id:
+            return
+        values = self.progress_table.item(row_id, "values")
+        if len(values) >= 3 and values[2]:
+            webbrowser.open(values[2])
 
 
 def main() -> None:

@@ -33,6 +33,7 @@ def test_audit_backlink_sites_marks_working_sites():
     assert statuses[0].site == "https://example.org"
     assert statuses[0].status == "working"
     assert statuses[0].link_made is True
+    assert statuses[0].verify_url == "https://example.org"
 
 
 def test_build_campaign_creates_scored_opportunities():
@@ -56,3 +57,4 @@ def test_write_exports(tmp_path):
     assert {path.name for path in paths} == {"opportunities.json", "opportunities.csv", "outreach.md", "link_progress.csv"}
     data = json.loads((tmp_path / "opportunities.json").read_text())
     assert data["domain"] == "example.com"
+    assert "verify_url" in (tmp_path / "link_progress.csv").read_text()

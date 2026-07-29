@@ -26,7 +26,8 @@ def main() -> None:
     print(f"Created {len(campaign.opportunities)} backlink opportunities for {campaign.domain}.")
     for status in audit_backlink_sites(backlink_sites):
         display_status = "Made / working" if status.link_made else "Not working / dead"
-        print(f"{display_status}: {status.site} ({status.detail})")
+        verify = f" verify: {status.verify_url}" if status.verify_url else ""
+        print(f"{display_status}: {status.site}{verify} ({status.detail})")
     for path in paths:
         print(path)
 

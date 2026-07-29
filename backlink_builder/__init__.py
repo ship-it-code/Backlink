@@ -1,5 +1,5 @@
 """Consent-first backlink opportunity builder."""
 
-from .core import BacklinkCampaign, build_campaign
+from .core import BacklinkCampaign, LinkStatus, audit_backlink_sites, build_campaign, load_backlink_sites
 
-__all__ = ["BacklinkCampaign", "build_campaign"]
+__all__ = ["BacklinkCampaign", "LinkStatus", "audit_backlink_sites", "build_campaign", "load_backlink_sites"]

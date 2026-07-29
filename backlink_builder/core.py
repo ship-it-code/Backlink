@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, asdict
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 import csv
 import json
 import re
@@ -17,6 +19,16 @@ class Opportunity:
     angle: str
     score: int
     next_step: str
+
+
+@dataclass(frozen=True)
+class LinkStatus:
+    """Live status for an imported backlink site during campaign building."""
+
+    site: str
+    status: str
+    detail: str
+    link_made: bool
 
 
 @dataclass(frozen=True)
@@ -79,6 +91,40 @@ def load_backlink_sites(path: str | Path | None) -> tuple[str, ...]:
             sites.append(normalize_url(candidate))
 
     return tuple(dict.fromkeys(sites))
+
+
+def check_site_status(site: str, timeout: float = 8.0, opener=urlopen) -> LinkStatus:
+    """Check whether an imported backlink site is reachable before outreach work starts."""
+    normalized = normalize_url(site)
+    try:
+        code = _request_status(normalized, "HEAD", timeout, opener)
+    except HTTPError as exc:
+        if exc.code in {403, 405}:
+            try:
+                code = _request_status(normalized, "GET", timeout, opener)
+            except HTTPError as get_exc:
+                code = get_exc.code
+            except (TimeoutError, URLError, OSError) as get_exc:
+                return LinkStatus(normalized, "dead", str(get_exc), False)
+        else:
+            code = exc.code
+    except (TimeoutError, URLError, OSError) as exc:
+        return LinkStatus(normalized, "dead", str(exc), False)
+
+    if 200 <= int(code) < 400:
+        return LinkStatus(normalized, "working", f"HTTP {code}", True)
+    return LinkStatus(normalized, "not working", f"HTTP {code}", False)
+
+
+def _request_status(site: str, method: str, timeout: float, opener) -> int:
+    request = Request(site, method=method, headers={"User-Agent": "BacklinkBuilder/1.0"})
+    response = opener(request, timeout=timeout)
+    return int(getattr(response, "status", getattr(response, "code", 200)))
+
+
+def audit_backlink_sites(sites: list[str] | tuple[str, ...], timeout: float = 8.0, opener=urlopen) -> tuple[LinkStatus, ...]:
+    """Return progress statuses for every imported backlink site."""
+    return tuple(check_site_status(site, timeout=timeout, opener=opener) for site in sites)
 
 
 def build_campaign(
@@ -152,6 +198,7 @@ def write_exports(campaign: BacklinkCampaign, output_dir: str | Path) -> list[Pa
     json_path = out / "opportunities.json"
     csv_path = out / "opportunities.csv"
     md_path = out / "outreach.md"
+    progress_path = out / "link_progress.csv"
 
     json_path.write_text(json.dumps(campaign.to_dict(), indent=2) + "\n", encoding="utf-8")
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
@@ -160,7 +207,13 @@ def write_exports(campaign: BacklinkCampaign, output_dir: str | Path) -> list[Pa
         for opportunity in campaign.opportunities:
             writer.writerow(asdict(opportunity))
     md_path.write_text(render_outreach(campaign), encoding="utf-8")
-    return [json_path, csv_path, md_path]
+    imported_sites = [item.target for item in campaign.opportunities if item.kind == "Imported backlink site"]
+    with progress_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["site", "status", "detail", "link_made"])
+        writer.writeheader()
+        for status in audit_backlink_sites(imported_sites):
+            writer.writerow(asdict(status))
+    return [json_path, csv_path, md_path, progress_path]
 
 
 def render_outreach(campaign: BacklinkCampaign) -> str:

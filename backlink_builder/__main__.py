@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 
-from .core import build_campaign, load_backlink_sites, write_exports
+from .core import audit_backlink_sites, build_campaign, load_backlink_sites, write_exports
 from .gui import main as gui_main
 
 
@@ -23,6 +23,9 @@ def main() -> None:
     campaign = build_campaign(args.website, args.keyword, backlink_sites)
     paths = write_exports(campaign, args.out)
     print(f"Created {len(campaign.opportunities)} backlink opportunities for {campaign.domain}.")
+    for status in audit_backlink_sites(backlink_sites):
+        display_status = "Made / working" if status.link_made else "Not working / dead"
+        print(f"{display_status}: {status.site} ({status.detail})")
     for path in paths:
         print(path)
 

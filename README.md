@@ -4,10 +4,25 @@ A consent-first backlink opportunity builder. Provide a website URL and the tool
 
 This project intentionally avoids spammy automated posting. It helps you find and organize ethical backlink campaigns; a human should review every prospect and send outreach only where it is relevant and allowed.
 
-## Quick start
+## GUI usage
+
+Launch the desktop interface:
 
 ```bash
-python -m backlink_builder https://example.com --keyword "example keyword" --out exports
+python -m backlink_builder --gui
+```
+
+The GUI has two primary inputs:
+
+1. **Website link** — the site you want to build backlinks for.
+2. **Backlink sites file** — an optional `.txt` or `.csv` attachment containing backlinking sites to review, one per line or comma-separated.
+
+Click **Build Backlink Plan** to generate the exports in the selected output folder.
+
+## CLI usage
+
+```bash
+python -m backlink_builder https://example.com --keyword "example keyword" --sites-file backlink-sites.txt --out exports
 ```
 
 Outputs:

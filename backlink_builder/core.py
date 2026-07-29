@@ -58,14 +58,41 @@ def default_keywords(domain: str) -> tuple[str, ...]:
     return (stem, f"{stem} resources", f"{stem} guide")
 
 
-def build_campaign(website: str, keywords: list[str] | None = None) -> BacklinkCampaign:
-    """Build an ethical backlink campaign from a website and optional keywords."""
+def load_backlink_sites(path: str | Path | None) -> tuple[str, ...]:
+    """Load optional backlink prospect URLs/domains from a text or CSV file."""
+    if not path:
+        return ()
+
+    source = Path(path)
+    if not source.exists():
+        raise FileNotFoundError(f"backlink sites file not found: {source}")
+
+    sites: list[str] = []
+    for raw_line in source.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        for token in line.split(","):
+            candidate = token.strip()
+            if not candidate or candidate.lower() in {"url", "site", "domain", "website"}:
+                continue
+            sites.append(normalize_url(candidate))
+
+    return tuple(dict.fromkeys(sites))
+
+
+def build_campaign(
+    website: str,
+    keywords: list[str] | None = None,
+    backlink_sites: list[str] | tuple[str, ...] | None = None,
+) -> BacklinkCampaign:
+    """Build an ethical backlink campaign from a website, keywords, and optional prospect sites."""
     normalized = normalize_url(website)
     domain = extract_domain(normalized)
     selected_keywords = tuple(k.strip() for k in (keywords or []) if k.strip()) or default_keywords(domain)
     primary = selected_keywords[0]
 
-    opportunities = (
+    opportunities = [
         Opportunity(
             kind="Resource page outreach",
             target=f"Search: {primary} + resources + submit",
@@ -101,8 +128,22 @@ def build_campaign(website: str, keywords: list[str] | None = None) -> BacklinkC
             score=74,
             next_step="Compile real relationships first; do not submit to unrelated low-quality directories.",
         ),
-    )
-    return BacklinkCampaign(normalized, domain, selected_keywords, opportunities)
+    ]
+
+    for site in backlink_sites or ():
+        prospect = normalize_url(site)
+        prospect_domain = extract_domain(prospect)
+        opportunities.append(
+            Opportunity(
+                kind="Imported backlink site",
+                target=prospect,
+                angle=f"Evaluate whether {prospect_domain} has a relevant placement where linking to {domain} would help readers.",
+                score=70,
+                next_step="Manually review the site rules and submit/contact only if backlinks are allowed and contextually useful.",
+            )
+        )
+
+    return BacklinkCampaign(normalized, domain, selected_keywords, tuple(opportunities))
 
 
 def write_exports(campaign: BacklinkCampaign, output_dir: str | Path) -> list[Path]:
